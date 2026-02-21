@@ -5,6 +5,7 @@ import sys
 
 from app.read_tool import READ_TOOL_SPEC, read_file_bytes
 from app.write_tool import WRITE_TOOL_SPEC, write_file_text
+from app.bash_tool import BASH_TOOL_SPEC, run_bash_command
 
 from openai import OpenAI
 
@@ -28,7 +29,7 @@ def main():
         chat = client.chat.completions.create(
             model="anthropic/claude-haiku-4.5",
             messages=messages,
-            tools=[READ_TOOL_SPEC, WRITE_TOOL_SPEC],
+            tools=[READ_TOOL_SPEC, WRITE_TOOL_SPEC, BASH_TOOL_SPEC],
         )
 
         if not chat.choices or len(chat.choices) == 0:
@@ -81,6 +82,9 @@ def main():
                 content = function_args["content"]
                 write_file_text(file_path, content)
                 tool_output_text = "OK"
+            elif function_name == "Bash":
+                command = function_args["command"]
+                tool_output_text = run_bash_command(command)
             else:
                 raise RuntimeError(f"unsupported tool: {function_name}")
 
