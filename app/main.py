@@ -4,6 +4,7 @@ import os
 import sys
 
 from app.read_tool import READ_TOOL_SPEC, read_file_bytes
+from app.write_tool import WRITE_TOOL_SPEC, write_file_text
 
 from openai import OpenAI
 
@@ -27,7 +28,7 @@ def main():
         chat = client.chat.completions.create(
             model="anthropic/claude-haiku-4.5",
             messages=messages,
-            tools=[READ_TOOL_SPEC],
+            tools=[READ_TOOL_SPEC, WRITE_TOOL_SPEC],
         )
 
         if not chat.choices or len(chat.choices) == 0:
@@ -71,12 +72,17 @@ def main():
             function_name = function.name
             function_args = json.loads(function.arguments or "{}")
 
-            if function_name != "Read":
+            if function_name == "Read":
+                file_path = function_args["file_path"]
+                tool_output_bytes = read_file_bytes(file_path)
+                tool_output_text = tool_output_bytes.decode("utf-8", errors="replace")
+            elif function_name == "Write":
+                file_path = function_args["file_path"]
+                content = function_args["content"]
+                write_file_text(file_path, content)
+                tool_output_text = "OK"
+            else:
                 raise RuntimeError(f"unsupported tool: {function_name}")
-
-            file_path = function_args["file_path"]
-            tool_output_bytes = read_file_bytes(file_path)
-            tool_output_text = tool_output_bytes.decode("utf-8", errors="replace")
 
             messages.append(
                 {
