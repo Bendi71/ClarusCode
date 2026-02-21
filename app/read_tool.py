@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from pathlib import Path
+
 READ_TOOL_SPEC = {
     "type": "function",
     "function": {
@@ -15,3 +19,7 @@ READ_TOOL_SPEC = {
         },
     },
 }
+
+
+def read_file_bytes(file_path: str) -> bytes:
+    return Path(file_path).read_bytes()

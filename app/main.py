@@ -1,8 +1,9 @@
 import argparse
+import json
 import os
 import sys
 
-from app.read_tool import READ_TOOL_SPEC
+from app.read_tool import READ_TOOL_SPEC, read_file_bytes
 
 from openai import OpenAI
 
@@ -32,8 +33,23 @@ def main():
     # You can use print statements as follows for debugging, they'll be visible when running tests.
     print("Logs from your program will appear here!", file=sys.stderr)
 
-    # TODO: Uncomment the following line to pass the first stage
-    print(chat.choices[0].message.content)
+    message = chat.choices[0].message
+
+    tool_calls = getattr(message, "tool_calls", None)
+    if tool_calls:
+        tool_call = tool_calls[0]
+        function = tool_call.function
+        function_name = function.name
+        function_args = json.loads(function.arguments or "{}")
+
+        if function_name != "Read":
+            raise RuntimeError(f"unsupported tool: {function_name}")
+
+        file_path = function_args["file_path"]
+        sys.stdout.buffer.write(read_file_bytes(file_path))
+        return
+
+    print(message.content)
 
 
 if __name__ == "__main__":
