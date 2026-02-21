@@ -21,35 +21,70 @@ def main():
 
     client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
-    chat = client.chat.completions.create(
-        model="anthropic/claude-haiku-4.5",
-        messages=[{"role": "user", "content": args.p}],
-        tools=[READ_TOOL_SPEC],
-    )
+    messages: list[dict] = [{"role": "user", "content": args.p}]
 
-    if not chat.choices or len(chat.choices) == 0:
-        raise RuntimeError("no choices in response")
+    while True:
+        chat = client.chat.completions.create(
+            model="anthropic/claude-haiku-4.5",
+            messages=messages,
+            tools=[READ_TOOL_SPEC],
+        )
 
-    # You can use print statements as follows for debugging, they'll be visible when running tests.
-    print("Logs from your program will appear here!", file=sys.stderr)
+        if not chat.choices or len(chat.choices) == 0:
+            raise RuntimeError("no choices in response")
 
-    message = chat.choices[0].message
+        choice = chat.choices[0]
+        message = choice.message
 
-    tool_calls = getattr(message, "tool_calls", None)
-    if tool_calls:
-        tool_call = tool_calls[0]
-        function = tool_call.function
-        function_name = function.name
-        function_args = json.loads(function.arguments or "{}")
+        # You can use print statements as follows for debugging, they'll be visible when running tests.
+        print("Logs from your program will appear here!", file=sys.stderr)
 
-        if function_name != "Read":
-            raise RuntimeError(f"unsupported tool: {function_name}")
+        assistant_msg: dict = {
+            "role": "assistant",
+            "content": message.content,
+        }
 
-        file_path = function_args["file_path"]
-        sys.stdout.buffer.write(read_file_bytes(file_path))
-        return
+        tool_calls = getattr(message, "tool_calls", None)
+        if tool_calls:
+            assistant_msg["tool_calls"] = [
+                {
+                    "id": tc.id,
+                    "type": tc.type,
+                    "function": {
+                        "name": tc.function.name,
+                        "arguments": tc.function.arguments,
+                    },
+                }
+                for tc in tool_calls
+            ]
 
-    print(message.content)
+        messages.append(assistant_msg)
+
+        if not tool_calls:
+            # Either finish_reason is "stop" or the model returned a plain message.
+            if message.content is not None:
+                print(message.content)
+            return
+
+        for tool_call in tool_calls:
+            function = tool_call.function
+            function_name = function.name
+            function_args = json.loads(function.arguments or "{}")
+
+            if function_name != "Read":
+                raise RuntimeError(f"unsupported tool: {function_name}")
+
+            file_path = function_args["file_path"]
+            tool_output_bytes = read_file_bytes(file_path)
+            tool_output_text = tool_output_bytes.decode("utf-8", errors="replace")
+
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": tool_output_text,
+                }
+            )
 
 
 if __name__ == "__main__":
