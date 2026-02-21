@@ -1,7 +1,8 @@
 import argparse
 import os
 import sys
-from read_tool import READ_TOOL_SPEC
+
+from app.read_tool import READ_TOOL_SPEC
 
 from openai import OpenAI
 
